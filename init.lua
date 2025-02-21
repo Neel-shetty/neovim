@@ -115,6 +115,11 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   end,
 })
 
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "go",
+  command = "setlocal expandtab shiftwidth=2 softtabstop=2"
+})
+
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
 local lazypath = vim.fn.stdpath 'data' .. '/lazy/lazy.nvim'
@@ -750,6 +755,7 @@ local lspconfig = require 'lspconfig'
 local lsp_capabilities = require('cmp_nvim_lsp').default_capabilities()
 lspconfig.lua_ls.setup { capabilities = lsp_capabilities }
 lspconfig.rust_analyzer.setup { capabilities = lsp_capabilities }
+lspconfig.hls.setup { capabilities = lsp_capabilities }
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
