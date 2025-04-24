@@ -190,7 +190,9 @@ vim.api.nvim_create_autocmd("FileType", {
 --
 
 -- Enhanced hover handler that shows EVERYTHING
+-- Enhanced hover handler that shows EVERYTHING
 local hover_win_id = nil
+
 local function enhanced_hover()
   local bufnr = vim.api.nvim_get_current_buf()
   local clients = vim.lsp.get_active_clients({ bufnr = bufnr })
@@ -253,28 +255,23 @@ local function enhanced_hover()
       max_height = 20
     })
 
-    -- Add q to quit keymap only if window was created
+    -- Add keymaps and manage hover_win_id if window was created
     if win_id then
+      -- Set hover_win_id to the new window ID
+      hover_win_id = win_id
+
+      -- Keymaps to close the window
       vim.api.nvim_buf_set_keymap(bufnr, 'n', 'q', '<cmd>q!<CR>', { noremap = true, silent = true })
       vim.api.nvim_buf_set_keymap(bufnr, 'n', '<Esc>', '<cmd>q!<CR>', { noremap = true, silent = true })
 
-      -- Automatically return focus to original window when closed
+      -- Clear hover_win_id when the window is closed
       vim.api.nvim_create_autocmd('WinClosed', {
-        buffer = bufnr,
+        pattern = tostring(win_id), -- Trigger only for this specific window
         once = true,
         callback = function()
-          vim.schedule(function()
-            if vim.api.nvim_win_is_valid(win_id) then
-              vim.api.nvim_set_current_win(vim.fn.win_getid(vim.fn.winnr('#')))
-            end
-          end)
+          hover_win_id = nil
         end
       })
-      -- Add jump-back mapping
-      vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>f',
-        '<cmd>lua require("your_config").jump_to_hover()<CR>',
-        { noremap = true, silent = true }
-      )
     end
   end
 end
@@ -290,6 +287,7 @@ vim.o.updatetime = 500 -- Hover delay (ms)
 -- Manual trigger keymap
 vim.keymap.set("n", "K", enhanced_hover, { desc = "Show VS Code-style hover" })
 
+-- Function to jump to the hover window
 function _G.jump_to_hover()
   if hover_win_id and vim.api.nvim_win_is_valid(hover_win_id) then
     vim.api.nvim_set_current_win(hover_win_id)
@@ -298,9 +296,8 @@ function _G.jump_to_hover()
   end
 end
 
-vim.keymap.set('n', '<leader>mg', '<cmd>lua jump_to_hover()<CR>',
-  { desc = 'Jump to hover window' }
-)
+-- Keymap to jump to the hover window
+vim.keymap.set('n', '<leader>mg', '<cmd>lua jump_to_hover()<CR>', { desc = 'Jump to hover window' })
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
