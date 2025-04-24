@@ -190,11 +190,17 @@ vim.api.nvim_create_autocmd("FileType", {
 --
 
 -- Enhanced hover handler that shows EVERYTHING
-
+local hover_win_id = nil
 local function enhanced_hover()
   local bufnr = vim.api.nvim_get_current_buf()
   local clients = vim.lsp.get_active_clients({ bufnr = bufnr })
   if #clients == 0 then return end
+
+  -- Clear previous window reference
+  if hover_win_id and vim.api.nvim_win_is_valid(hover_win_id) then
+    vim.api.nvim_win_close(hover_win_id, true)
+  end
+  hover_win_id = nil
 
   -- Get position with proper encoding
   local position_encoding = clients[1].offset_encoding or "utf-16"
@@ -234,23 +240,44 @@ local function enhanced_hover()
 
   -- Only show if we have content
   if #contents > 0 then
-    -- Convert to string if we got a table
     local text = type(contents) == "table" and table.concat(contents, "\n") or contents
-    -- Ensure text is a string
     if type(text) ~= "string" then
       text = tostring(text)
     end
 
-    vim.lsp.util.open_floating_preview({ text }, "markdown", {
+    -- Create the floating window
+    local bufnr, win_id = vim.lsp.util.open_floating_preview({ text }, "markdown", {
       border = "rounded",
       focusable = true,
       max_width = 80,
       max_height = 20
     })
+
+    -- Add q to quit keymap only if window was created
+    if win_id then
+      vim.api.nvim_buf_set_keymap(bufnr, 'n', 'q', '<cmd>q!<CR>', { noremap = true, silent = true })
+      vim.api.nvim_buf_set_keymap(bufnr, 'n', '<Esc>', '<cmd>q!<CR>', { noremap = true, silent = true })
+
+      -- Automatically return focus to original window when closed
+      vim.api.nvim_create_autocmd('WinClosed', {
+        buffer = bufnr,
+        once = true,
+        callback = function()
+          vim.schedule(function()
+            if vim.api.nvim_win_is_valid(win_id) then
+              vim.api.nvim_set_current_win(vim.fn.win_getid(vim.fn.winnr('#')))
+            end
+          end)
+        end
+      })
+      -- Add jump-back mapping
+      vim.api.nvim_buf_set_keymap(bufnr, 'n', '<leader>f',
+        '<cmd>lua require("your_config").jump_to_hover()<CR>',
+        { noremap = true, silent = true }
+      )
+    end
   end
 end
-
-
 
 -- Auto-trigger on hover
 vim.api.nvim_create_autocmd("CursorHold", {
@@ -262,6 +289,18 @@ vim.o.updatetime = 500 -- Hover delay (ms)
 
 -- Manual trigger keymap
 vim.keymap.set("n", "K", enhanced_hover, { desc = "Show VS Code-style hover" })
+
+function _G.jump_to_hover()
+  if hover_win_id and vim.api.nvim_win_is_valid(hover_win_id) then
+    vim.api.nvim_set_current_win(hover_win_id)
+  else
+    vim.notify("No hover window available", vim.log.levels.WARN)
+  end
+end
+
+vim.keymap.set('n', '<leader>mg', '<cmd>lua jump_to_hover()<CR>',
+  { desc = 'Jump to hover window' }
+)
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
