@@ -131,6 +131,59 @@ vim.api.nvim_create_autocmd("FileType", {
   command = "setlocal expandtab shiftwidth=2 softtabstop=2"
 })
 
+
+-- Show diagnostics in a floating window when the cursor is over a line with a diagnostic
+vim.api.nvim_create_autocmd('CursorHold', {
+  callback = function()
+    local opts = {
+      focusable = false,
+      close_events = { "BufLeave", "CursorMoved", "InsertEnter", "FocusLost" },
+      border = 'rounded',
+      source = 'always',
+      prefix = ' ',
+      scope = 'cursor',
+    }
+    vim.diagnostic.open_float(nil, opts)
+  end
+})
+-- time to wait before showing diagnostics
+vim.o.updatetime = 250
+vim.keymap.set('n', '<leader>my', function()
+  -- Get ALL diagnostics for current line (not just cursor position)
+  local line_diags = vim.diagnostic.get(0, { lnum = vim.fn.line('.') - 1 })
+
+  if #line_diags == 0 then
+    vim.notify("No diagnostics found", vim.log.levels.WARN)
+    return
+  end
+
+  -- Process all diagnostics on the line
+  local combined = {}
+  for _, diag in ipairs(line_diags) do
+    -- Clean and format each diagnostic message
+    local msg = diag.message:gsub('\n', ' '):gsub('%s+', ' '):gsub('^%s+', '')
+    table.insert(combined, string.format("[%s] %s", diag.source or "unknown", msg))
+  end
+
+  -- Combine all messages with double newlines
+  local full_content = table.concat(combined, "\n\n")
+
+  -- Copy to both clipboards
+  vim.fn.setreg('+', full_content) -- System clipboard
+  vim.fn.setreg('"', full_content) -- Default register
+
+  -- Show first 3 lines of what was copied
+  local preview = #combined > 3
+      and table.concat({ combined[1], combined[2], combined[3], "..." }, "\n")
+      or full_content
+
+  vim.notify("Copied diagnostics", vim.log.levels.INFO, {
+    title = "Diagnostics Copied",
+    timeout = 3000,
+  })
+end, { desc = 'Copy ALL diagnostic messages on line' })
+-- end diagnostics
+
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
 local lazypath = vim.fn.stdpath 'data' .. '/lazy/lazy.nvim'
