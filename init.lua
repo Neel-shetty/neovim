@@ -15,6 +15,10 @@ vim.g.have_nerd_font = true
 vim.opt.number = true
 vim.opt.relativenumber = true
 
+vim.opt.tabstop = 2       -- number of spaces that a <tab> in the file counts for
+vim.opt.shiftwidth = 2    -- number of spaces to use for each step of (auto)indent
+vim.opt.expandtab = false -- use tabs instead of spaces
+
 -- Enable mouse mode, can be useful for resizing splits for example!
 vim.opt.mouse = 'a'
 
