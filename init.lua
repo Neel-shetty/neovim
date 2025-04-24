@@ -136,57 +136,132 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 
--- Show diagnostics in a floating window when the cursor is over a line with a diagnostic
-vim.api.nvim_create_autocmd('CursorHold', {
+-- -- Show diagnostics in a floating window when the cursor is over a line with a diagnostic
+-- vim.api.nvim_create_autocmd('CursorHold', {
+--   callback = function()
+--     local opts = {
+--       focusable = false,
+--       close_events = { "BufLeave", "CursorMoved", "InsertEnter", "FocusLost" },
+--       border = 'rounded',
+--       source = 'always',
+--       prefix = ' ',
+--       scope = 'cursor',
+--     }
+--     vim.diagnostic.open_float(nil, opts)
+--   end
+-- })
+-- -- time to wait before showing diagnostics
+-- vim.o.updatetime = 250
+-- vim.keymap.set('n', '<leader>my', function()
+--   -- Get ALL diagnostics for current line (not just cursor position)
+--   local line_diags = vim.diagnostic.get(0, { lnum = vim.fn.line('.') - 1 })
+--
+--   if #line_diags == 0 then
+--     vim.notify("No diagnostics found", vim.log.levels.WARN)
+--     return
+--   end
+--
+--   -- Process all diagnostics on the line
+--   local combined = {}
+--   for _, diag in ipairs(line_diags) do
+--     -- Clean and format each diagnostic message
+--     local msg = diag.message:gsub('\n', ' '):gsub('%s+', ' '):gsub('^%s+', '')
+--     table.insert(combined, string.format("[%s] %s", diag.source or "unknown", msg))
+--   end
+--
+--   -- Combine all messages with double newlines
+--   local full_content = table.concat(combined, "\n\n")
+--
+--   -- Copy to both clipboards
+--   vim.fn.setreg('+', full_content) -- System clipboard
+--   vim.fn.setreg('"', full_content) -- Default register
+--
+--   -- Show first 3 lines of what was copied
+--   local preview = #combined > 3
+--       and table.concat({ combined[1], combined[2], combined[3], "..." }, "\n")
+--       or full_content
+--
+--   vim.notify("Copied diagnostics", vim.log.levels.INFO, {
+--     title = "Diagnostics Copied",
+--     timeout = 3000,
+--   })
+-- end, { desc = 'Copy ALL diagnostic messages on line' })
+-- -- end diagnostics
+--
+
+-- Enhanced hover handler that shows EVERYTHING
+
+local function enhanced_hover()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local clients = vim.lsp.get_active_clients({ bufnr = bufnr })
+  if #clients == 0 then return end
+
+  -- Get position with proper encoding
+  local position_encoding = clients[1].offset_encoding or "utf-16"
+  local params = vim.lsp.util.make_position_params(0, position_encoding)
+
+  -- Process hover results
+  local hover_results = vim.lsp.buf_request_sync(bufnr, 'textDocument/hover', params)
+  local contents = {}
+
+  for _, result in pairs(hover_results or {}) do
+    if result.result then
+      local value = result.result.contents
+      if value then
+        -- Handle different content formats
+        if type(value) == "string" then
+          table.insert(contents, value)
+        elseif value.value then
+          table.insert(contents, value.value)
+        elseif type(value) == "table" then
+          for _, item in ipairs(value) do
+            if item.value then table.insert(contents, item.value) end
+          end
+        end
+      end
+    end
+  end
+
+  -- Add diagnostics
+  local line = vim.api.nvim_win_get_cursor(0)[1] - 1
+  local diags = vim.diagnostic.get(bufnr, { lnum = line })
+  if #diags > 0 then
+    table.insert(contents, "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄")
+    for _, d in ipairs(diags) do
+      table.insert(contents, string.format("[%s] %s", d.source or "diagnostic", d.message))
+    end
+  end
+
+  -- Only show if we have content
+  if #contents > 0 then
+    -- Convert to string if we got a table
+    local text = type(contents) == "table" and table.concat(contents, "\n") or contents
+    -- Ensure text is a string
+    if type(text) ~= "string" then
+      text = tostring(text)
+    end
+
+    vim.lsp.util.open_floating_preview({ text }, "markdown", {
+      border = "rounded",
+      focusable = true,
+      max_width = 80,
+      max_height = 20
+    })
+  end
+end
+
+
+
+-- Auto-trigger on hover
+vim.api.nvim_create_autocmd("CursorHold", {
   callback = function()
-    local opts = {
-      focusable = false,
-      close_events = { "BufLeave", "CursorMoved", "InsertEnter", "FocusLost" },
-      border = 'rounded',
-      source = 'always',
-      prefix = ' ',
-      scope = 'cursor',
-    }
-    vim.diagnostic.open_float(nil, opts)
+    pcall(enhanced_hover) -- Prevent errors from breaking the UI
   end
 })
--- time to wait before showing diagnostics
-vim.o.updatetime = 250
-vim.keymap.set('n', '<leader>my', function()
-  -- Get ALL diagnostics for current line (not just cursor position)
-  local line_diags = vim.diagnostic.get(0, { lnum = vim.fn.line('.') - 1 })
+vim.o.updatetime = 500 -- Hover delay (ms)
 
-  if #line_diags == 0 then
-    vim.notify("No diagnostics found", vim.log.levels.WARN)
-    return
-  end
-
-  -- Process all diagnostics on the line
-  local combined = {}
-  for _, diag in ipairs(line_diags) do
-    -- Clean and format each diagnostic message
-    local msg = diag.message:gsub('\n', ' '):gsub('%s+', ' '):gsub('^%s+', '')
-    table.insert(combined, string.format("[%s] %s", diag.source or "unknown", msg))
-  end
-
-  -- Combine all messages with double newlines
-  local full_content = table.concat(combined, "\n\n")
-
-  -- Copy to both clipboards
-  vim.fn.setreg('+', full_content) -- System clipboard
-  vim.fn.setreg('"', full_content) -- Default register
-
-  -- Show first 3 lines of what was copied
-  local preview = #combined > 3
-      and table.concat({ combined[1], combined[2], combined[3], "..." }, "\n")
-      or full_content
-
-  vim.notify("Copied diagnostics", vim.log.levels.INFO, {
-    title = "Diagnostics Copied",
-    timeout = 3000,
-  })
-end, { desc = 'Copy ALL diagnostic messages on line' })
--- end diagnostics
+-- Manual trigger keymap
+vim.keymap.set("n", "K", enhanced_hover, { desc = "Show VS Code-style hover" })
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -376,6 +451,9 @@ require('lazy').setup({
       { 'williamboman/mason.nvim', config = true }, -- NOTE: Must be loaded before dependants
       'williamboman/mason-lspconfig.nvim',
       'WhoIsSethDaniel/mason-tool-installer.nvim',
+
+      "folke/lsp-colors.nvim",
+      "ray-x/lsp_signature.nvim",
 
       -- Useful status updates for LSP.
       -- NOTE: `opts = {}` is the same as calling `require('fidget').setup({})`
