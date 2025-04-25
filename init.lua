@@ -189,14 +189,23 @@ vim.api.nvim_create_autocmd("FileType", {
 -- -- end diagnostics
 --
 
--- Enhanced hover handler that shows EVERYTHING
--- Enhanced hover handler that shows EVERYTHING
-local hover_win_id = nil
 
+local hover_win_id = nil
+-- Enhanced hover handler that shows EVERYTHING
 local function enhanced_hover()
   local bufnr = vim.api.nvim_get_current_buf()
-  local clients = vim.lsp.get_active_clients({ bufnr = bufnr })
+  local clients = vim.lsp.get_clients({ bufnr = bufnr })
   if #clients == 0 then return end
+
+  -- Check if any client supports textDocument/hover
+  local supports_hover = false
+  for _, client in ipairs(clients) do
+    if client.supports_method('textDocument/hover') then
+      supports_hover = true
+      break
+    end
+  end
+  if not supports_hover then return end
 
   -- Clear previous window reference
   if hover_win_id and vim.api.nvim_win_is_valid(hover_win_id) then
@@ -282,7 +291,6 @@ vim.api.nvim_create_autocmd("CursorHold", {
     pcall(enhanced_hover) -- Prevent errors from breaking the UI
   end
 })
-vim.o.updatetime = 500 -- Hover delay (ms)
 
 -- Manual trigger keymap
 vim.keymap.set("n", "K", enhanced_hover, { desc = "Show VS Code-style hover" })
@@ -608,6 +616,7 @@ require('lazy').setup({
       local servers = {
         gopls = {},
         pyright = {},
+        markdownlint = {},
         kotlin_language_server = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
