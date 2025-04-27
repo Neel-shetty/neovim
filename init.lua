@@ -135,6 +135,15 @@ vim.api.nvim_create_autocmd("FileType", {
   command = "setlocal expandtab shiftwidth=2 softtabstop=2"
 })
 
+vim.api.nvim_create_autocmd('LspAttach', {
+  callback = function(args)
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+    if client.server_capabilities.renameProvider then
+      vim.keymap.set('n', '<F2>', vim.lsp.buf.rename, { buffer = args.buf, desc = 'Rename symbol' })
+    end
+  end,
+})
+
 
 -- -- Show diagnostics in a floating window when the cursor is over a line with a diagnostic
 -- vim.api.nvim_create_autocmd('CursorHold', {
@@ -444,7 +453,7 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>sw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
       vim.keymap.set('n', '<leader>sg', builtin.live_grep, { desc = '[S]earch by [G]rep' })
       vim.keymap.set('n', '<leader>sd', builtin.diagnostics, { desc = '[S]earch [D]iagnostics' })
-      vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
+      -- vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
       vim.keymap.set('n', '<leader>s.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
       vim.keymap.set('n', '<leader><leader>', builtin.buffers, { desc = '[ ] Find existing buffers' })
 
